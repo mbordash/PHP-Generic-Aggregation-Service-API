@@ -14,7 +14,7 @@ class ResourceNotFoundException extends Exception {}
 // put metric upsert KeyMetricsDaily
 // apiKeyId, daydate, scope, key, count
 
-$app->put('/aggr/inc/:scope/:key', function ($incScope, $incKey) {
+$app->put('/event/inc/:scope/:key', function ($incScope, $incKey) {
     global $env;
 
     $apiKeyId = $env['apiKeyId'];
@@ -50,7 +50,7 @@ $app->put('/aggr/inc/:scope/:key', function ($incScope, $incKey) {
     $collection->findAndModify($findApiKey, $updateApiKey, null, $updateOptions);
 });
 
-$app->put('/aggr/dec/:scope/:key', function ($incScope, $incKey) {
+$app->put('/event/dec/:scope/:key', function ($incScope, $incKey) {
     global $env;
 
     $apiKeyId = $env['apiKeyId'];
@@ -86,7 +86,7 @@ $app->put('/aggr/dec/:scope/:key', function ($incScope, $incKey) {
     $collection->findAndModify($findApiKey, $updateApiKey, null, $updateOptions);
 });
 
-$app->put('/aggr/set/:scope/:key/:val/:date', function ($incScope, $incKey, $incVal, $incDate) {
+$app->put('/event/set/:scope/:key/:val/:date', function ($incScope, $incKey, $incVal, $incDate) {
     global $env;
 
     $apiKeyId = $env['apiKeyId'];
@@ -123,7 +123,7 @@ $app->put('/aggr/set/:scope/:key/:val/:date', function ($incScope, $incKey, $inc
 });
 
 // get metrics
-$app->get('/aggr/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $incStart = '', $incEnd = '', $incKey = null) {
+$app->get('/event/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $incStart = '', $incEnd = '', $incKey = null) {
     global $env;
 
     $apiKeyId = $env['apiKeyId'];
