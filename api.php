@@ -167,7 +167,63 @@ $app->get('/event/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $in
     foreach ($cursor as $doc) {
         $totalCount = $totalCount + (int)$doc['count'];
     }
-    echo '{"count": ' . jsonpWrap(json_encode($totalCount)) . '}';
+    echo jsonpWrap('{"count": ' . json_encode($totalCount) . '}');
+});
+
+// get query result
+$app->get('/event/query/:inputOperator/:inputOperand', function ($inputOperator, $inputOperand) {
+    global $env;
+
+    $apiKeyId = $env['apiKeyId'];
+
+    $queryOperand = (int)$inputOperand;
+
+    switch ($inputOperator) {
+
+        case "lt":
+            $queryWhere = array('count' => array('$lt' => $queryOperand));
+            break;
+        case "lte":
+            $queryWhere = array('count' => array('$lte' => $queryOperand));
+            break;
+        case "gt":
+            $queryWhere = array('count' => array('$gt' => $queryOperand));
+            break;
+        case "gte":
+            $queryWhere = array('count' => array('$gte' => $queryOperand));
+            break;
+        default:
+            exit();
+    }
+
+    $db = new MongoClient();
+    $db = $db->DayScopeKeyMetrics;
+    $collection = $db->$apiKeyId;
+
+    $queryFields = array(
+        'scope' => true,
+        'key' => true,
+        'count' => true,
+        'created_on' => true
+    );
+
+    $resultsArray = array();
+
+    $cursor = $collection->find($queryWhere,$queryFields);
+    foreach ($cursor as $doc) {
+        $temp = array(
+            'scope' => $doc['scope'],
+            'key' => $doc['key'],
+            'count' => $doc['count'],
+            'created_on' => date('Y-m-d H:i:s', $doc['created_on']->sec)
+        );
+        array_push($resultsArray, $temp);
+    }
+    if (!$resultsArray) {
+        $resultsArray = "nothing found matching your query";
+    }
+    echo jsonpWrap('{"results": ' . json_encode($resultsArray) . '}');
+
 });
 
 
