@@ -171,7 +171,7 @@ $app->get('/event/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $in
 });
 
 // get list by operator/operand
-$app->get('/event/query/:inputOperator/:inputOperand/:scope(/:key)(/:group_by)', function ($inputOperator, $inputOperand, $inputScope, $inputKey = null, $inputGroupBy = false) {
+$app->get('/event/query/:inputOperator/:inputOperand/:scope(/:key)(/:group_by)', function ($inputOperator, $inputOperand, $inputScope, $inputKey = '', $inputGroupBy = false) {
     global $env;
 
     $apiKeyId = $env['apiKeyId'];
@@ -187,7 +187,7 @@ $app->get('/event/query/:inputOperator/:inputOperand/:scope(/:key)(/:group_by)',
     $inputScope = (string)$inputScope;
     $arrayInputKey = null;
 
-    if($inputKey) {
+    if (!empty(trim($inputKey))) {
         $inputKey = (string)$inputKey;
         $arrayInputKey = array('key' => $inputKey);
     }
@@ -259,7 +259,7 @@ $app->get('/event/query/:inputOperator/:inputOperand/:scope(/:key)(/:group_by)',
                 'created_on' => date('Y-m-d H:i:s', $doc['created_on']->sec)
             );
 
-            if ($inputKey) {
+            if (!$inputKey) {
                 $temp['key'] = $doc['key'];
 
             }
