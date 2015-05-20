@@ -170,13 +170,27 @@ $app->get('/event/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $in
     echo jsonpWrap('{"count": ' . json_encode($totalCount) . '}');
 });
 
-// get query result
-$app->get('/event/query/:inputOperator/:inputOperand', function ($inputOperator, $inputOperand) {
+// get list by operator/operand
+$app->get('/event/query/:inputOperator/:inputOperand/:scope(/:key)(/:group_by)', function ($inputOperator, $inputOperand, $inputScope, $inputKey = null, $inputGroupBy = false) {
     global $env;
 
     $apiKeyId = $env['apiKeyId'];
 
+    //setup db
+
+    $db = new MongoClient();
+    $db = $db->DayScopeKeyMetrics;
+    $collection = $db->$apiKeyId;
+
+    // setup query
     $queryOperand = (int)$inputOperand;
+    $inputScope = (string)$inputScope;
+    $arrayInputKey = null;
+
+    if($inputKey) {
+        $inputKey = (string)$inputKey;
+        $arrayInputKey = array('key' => $inputKey);
+    }
 
     switch ($inputOperator) {
 
@@ -196,33 +210,74 @@ $app->get('/event/query/:inputOperator/:inputOperand', function ($inputOperator,
             exit();
     }
 
-    $db = new MongoClient();
-    $db = $db->DayScopeKeyMetrics;
-    $collection = $db->$apiKeyId;
+    if($arrayInputKey) {
+        $queryWhere = array_merge($queryWhere, $arrayInputKey);
+    }
 
-    $queryFields = array(
-        'scope' => true,
-        'key' => true,
-        'count' => true,
-        'created_on' => true
+    $queryWhere = array_merge(array('scope' => $inputScope), $queryWhere);
+
+    $queryMatch = array('$match' =>
+        array(
+            '$and' => array(
+                array_merge($queryWhere)
+            )
+        )
     );
 
     $resultsArray = array();
 
-    $cursor = $collection->find($queryWhere,$queryFields);
-    foreach ($cursor as $doc) {
-        $temp = array(
-            'scope' => $doc['scope'],
-            'key' => $doc['key'],
-            'count' => $doc['count'],
-            'created_on' => date('Y-m-d H:i:s', $doc['created_on']->sec)
+    //setup group by & execute
+    if ($inputGroupBy) {
+        $queryGroup = array(
+            '$group' => array(
+                '_id' => '$created_on',
+                'count' => array( '$sum' => '$count'),
+                'countKeys' => array( '$sum' => 1 )
+            )
         );
-        array_push($resultsArray, $temp);
+        $cursor = $collection->aggregate($queryMatch,$queryGroup);
+
+        foreach ((array)$cursor['result'] as $doc) {
+
+            $temp = array(
+                'count' => $doc['count'],
+                'created_on' => date('Y-m-d H:i:s', $doc['_id']->sec),
+                'countKeys' => $doc['countKeys']
+            );
+
+            array_push($resultsArray, $temp);
+
+        }
+
+    } else {
+        $cursor = $collection->aggregate($queryMatch);
+
+        foreach ((array)$cursor['result'] as $doc) {
+
+            $temp = array(
+                'count' => $doc['count'],
+                'created_on' => date('Y-m-d H:i:s', $doc['created_on']->sec)
+            );
+
+            if ($inputKey) {
+                $temp['key'] = $doc['key'];
+
+            }
+            array_push($resultsArray, $temp);
+        }
     }
+
+
     if (!$resultsArray) {
         $resultsArray = "nothing found matching your query";
     }
-    echo jsonpWrap('{"results": ' . json_encode($resultsArray) . '}');
+
+    if($inputKey) {
+        $resultsLabel = '"key" : "' . $inputKey .'",';
+    } else {
+        $resultsLabel = '"scope" : "' . $inputScope .'",';
+    }
+    echo jsonpWrap('{'. $resultsLabel .'"results": ' . json_encode($resultsArray) . '}');
 
 });
 
