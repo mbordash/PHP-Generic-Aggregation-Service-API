@@ -171,8 +171,8 @@ $app->get('/event/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $in
 });
 
 // get list by operator/operand
-$app->get('/event/query/:inputOperator/:inputOperand/:scope(/:key)(/:group_by)', function ($inputOperator, $inputOperand, $inputScope, $inputKey = '', $inputGroupBy = false) {
-    global $env;
+$app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)', function ($inputOperator, $inputOperand, $inputScope, $inputKey = '', $inputGroupBy = false) {
+    global $env, $app;
 
     $apiKeyId = $env['apiKeyId'];
 
@@ -182,14 +182,21 @@ $app->get('/event/query/:inputOperator/:inputOperand/:scope(/:key)(/:group_by)',
     $db = $db->DayScopeKeyMetrics;
     $collection = $db->$apiKeyId;
 
-    // setup query
+    // setup query vars
     $queryOperand = (int)$inputOperand;
     $inputScope = (string)$inputScope;
     $arrayInputKey = null;
+    $inputKey = trim($inputKey);
 
-    if (!empty(trim($inputKey))) {
+    if (!empty($inputKey)) {
         $inputKey = (string)$inputKey;
         $arrayInputKey = array('key' => $inputKey);
+    } else {
+        $inputKey = $app->request()->params('key');
+    }
+
+    if (empty($inputGroupBy)) {
+        $inputGroupBy = $app->request()->params('group_by');
     }
 
     switch ($inputOperator) {
@@ -223,7 +230,6 @@ $app->get('/event/query/:inputOperator/:inputOperand/:scope(/:key)(/:group_by)',
             )
         )
     );
-
     $resultsArray = array();
 
     //setup group by & execute
