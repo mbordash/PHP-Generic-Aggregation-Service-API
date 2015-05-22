@@ -11,23 +11,58 @@ $app->add(new \InternetDJAuthMiddleware());
 // supporting classes & functions
 class ResourceNotFoundException extends Exception {}
 
-// put metric upsert KeyMetricsDaily
-// apiKeyId, daydate, scope, key, count
+// start api methods
 
-$app->put('/event/inc/:scope/:key', function ($incScope, $incKey) {
-    global $env;
+$app->put('/event/put(/:action)(/:scope)(/:key)', function () {
+    global $env, $app;
 
     $apiKeyId = $env['apiKeyId'];
 
+    // required params
+    if (!empty($app->request()->params('action'))) {
+        $inputAction = $app->request()->params('action');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"action required."}');
+    }
+
+    if (!empty($app->request()->params('scope'))) {
+        $inputScope = $app->request()->params('scope');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"scope required."}');
+    }
+
+    if (!empty($app->request()->params('key'))) {
+        $inputKey = $app->request()->params('key');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"key required."}');
+    }
+
+    switch ($inputAction) {
+        case "inc":
+            $updateApiKey = array(
+                '$inc' => array('count' => 1)
+            );
+            break;
+
+        case "dec":
+            $updateApiKey = array(
+                '$inc' => array('count' => -1)
+            );
+            break;
+
+        default:
+            $app->contentType('application/json');
+            $app->halt(500, '{"error":"action must be inc or dec."}');
+            break;
+    }
+
+    // setup db & query
     $db = new MongoClient();
-
-    // Select the store DB
     $db = $db->DayScopeKeyMetrics;
-
-    // Select a collection
     $collection = $db->$apiKeyId;
-
-    // Find, Modify, Upsert
 
     $dt = new DateTime(date('Y-m-d'), new DateTimeZone('UTC'));
     $ts = $dt->getTimestamp();
@@ -35,13 +70,10 @@ $app->put('/event/inc/:scope/:key', function ($incScope, $incKey) {
 
     $findApiKey = array(
         'created_on' => $today,
-        'scope' => $incScope,
-        'key' => $incKey
+        'scope' => $inputScope,
+        'key' => $inputKey
     );
 
-    $updateApiKey = array(
-        '$inc' => array('count' => 1)
-    );
 
     $updateOptions = array(
         'upsert' => true
@@ -50,69 +82,59 @@ $app->put('/event/inc/:scope/:key', function ($incScope, $incKey) {
     $collection->findAndModify($findApiKey, $updateApiKey, null, $updateOptions);
 });
 
-$app->put('/event/dec/:scope/:key', function ($incScope, $incKey) {
-    global $env;
+
+$app->put('/event/set(/:scope)(/:key)(/:val)(/:date)', function () {
+    global $env, $app;
 
     $apiKeyId = $env['apiKeyId'];
 
+    // required params
+    if (!empty($app->request()->params('scope'))) {
+        $inputScope = $app->request()->params('scope');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"scope required."}');
+    }
+
+    if (!empty($app->request()->params('key'))) {
+        $inputKey = $app->request()->params('key');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"key required."}');
+    }
+
+    if (!empty($app->request()->params('val'))) {
+        $inputVal = (int)$app->request()->params('val');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"val required."}');
+    }
+
+    if (!empty($app->request()->params('date'))) {
+        $inputDate = $app->request()->params('date');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"date required."}');
+    }
+
+    // setup db & query
     $db = new MongoClient();
-
-    // Select the store DB
     $db = $db->DayScopeKeyMetrics;
-
-    // Select a collection
-    $collection = $db->$apiKeyId;
-
-    // Find, Modify, Upsert
-
-    $dt = new DateTime(date('Y-m-d'), new DateTimeZone('UTC'));
-    $ts = $dt->getTimestamp();
-    $today = new MongoDate($ts);
-
-    $findApiKey = array(
-        'created_on' => $today,
-        'scope' => $incScope,
-        'key' => $incKey
-    );
-
-    $updateApiKey = array(
-        '$inc' => array('count' => -1)
-    );
-
-    $updateOptions = array(
-        'upsert' => true
-    );
-
-    $collection->findAndModify($findApiKey, $updateApiKey, null, $updateOptions);
-});
-
-$app->put('/event/set/:scope/:key/:val/:date', function ($incScope, $incKey, $incVal, $incDate) {
-    global $env;
-
-    $apiKeyId = $env['apiKeyId'];
-    $incVal = (int)$incVal;
-
-    $db = new MongoClient();
-
-    // Select the store DB
-    $db = $db->DayScopeKeyMetrics;
-
-    // Select a collection
     $collection = $db->$apiKeyId;
 
     // Find, Modify, Upsert
 
     $findApiKey = array(
-        'created_on' => new MongoDate(strtotime($incDate)),
-        'scope' => $incScope,
-        'key' => $incKey
+        'created_on' => new MongoDate(strtotime($inputDate)),
+        'scope' => $inputScope,
+        'key' => $inputKey
     );
 
     $updateApiKey = array(
-        'created_on' => new MongoDate(strtotime($incDate)),
-        'scope' => $incScope,
-        'key' => $incKey,
-        'count' => $incVal
+        'created_on' => new MongoDate(strtotime($inputDate)),
+        'scope' => $inputScope,
+        'key' => $inputKey,
+        'count' => $inputVal
     );
 
     $updateOptions = array(
@@ -123,34 +145,57 @@ $app->put('/event/set/:scope/:key/:val/:date', function ($incScope, $incKey, $in
 });
 
 // get metrics
-$app->get('/event/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $incStart = '', $incEnd = '', $incKey = null) {
-    global $env;
+$app->get('/event/count(/:scope)(/:start)(/:end)(/:key)', function () {
+    global $env, $app;
 
     $apiKeyId = $env['apiKeyId'];
+    $inputKey = null;
+    $inputStart = null;
+    $inputEnd = null;
+
+    // required params
+    if (!empty($app->request()->params('scope'))) {
+        $inputScope = $app->request()->params('scope');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"scope required."}');
+    }
+
+    // optional params
+    if (!empty($app->request()->params('start'))) {
+        $inputStart = (string)$app->request()->params('start');
+    }
+
+    if (!empty($app->request()->params('end'))) {
+        $inputEnd = (string)$app->request()->params('end');
+    }
+
+    if (!empty($app->request()->params('key'))) {
+        $inputKey = (string)$app->request()->params('key');
+    }
+
+    // setup db & query
 
     $db = new MongoClient();
     $db = $db->DayScopeKeyMetrics;
     $collection = $db->$apiKeyId;
 
     $countQuery = array(
-        'scope' => $incScope
+        'scope' => $inputScope
     );
 
-    if (!empty(trim($incKey))) {
-        $countQuery['key'] = $incKey;
+    if (!empty(trim($inputKey))) {
+        $countQuery['key'] = $inputKey;
     }
 
-    //$incStart = new MongoDate(strtotime("2010-01-15 00:00:00"));
-    //$incEnd = new MongoDate(strtotime("2016-01-15 00:00:00"));
+    if ($inputStart && $inputEnd) {
 
-    if ($incStart && $incEnd) {
-
-        $incStart = new MongoDate(strtotime($incStart));
-        $incEnd = new MongoDate(strtotime($incEnd));
+        $inputStart = new MongoDate(strtotime($inputStart));
+        $inputEnd = new MongoDate(strtotime($inputEnd));
 
         $dateRange = array(
-            '$gt' => $incStart,
-            '$lte' => $incEnd
+            '$gt' => $inputStart,
+            '$lte' => $inputEnd
         );
 
         $countQuery['created_on'] = $dateRange;
@@ -171,7 +216,7 @@ $app->get('/event/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $in
 });
 
 // get list by operator/operand
-$app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)(/:page)', function ($inputOperator, $inputOperand, $inputScope, $inputKey = '', $inputGroupBy = false, $inputPage = 0) {
+$app->get('/event/query(/:operator)(/:operand)(/:scope)(/:key)(/:group_by)(/:page)', function () {
     global $env, $app;
 
     $apiKeyId = $env['apiKeyId'];
@@ -183,39 +228,50 @@ $app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)(/:page)', f
     $db = $db->DayScopeKeyMetrics;
     $collection = $db->$apiKeyId;
 
-    // setup query vars
-    $queryOperand = (int)$inputOperand;
-    $inputScope = (string)$inputScope;
+    // setup params
     $arrayInputKey = null;
-    $inputKey = trim($inputKey);
-    $inputPage = (int)$inputPage;
+    $inputPage = 0;
 
-    if (!empty($inputKey)) {
-        $inputKey = (string)$inputKey;
+    // required params
+    if (!empty($app->request()->params('scope'))) {
+        $inputScope = $app->request()->params('scope');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"scope required."}');
+    }
+
+    if (null !== $app->request()->params('operand')) {
+        $queryOperand = (int)$app->request()->params('operand');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"operand required."}');
+    }
+
+    if (!empty($app->request()->params('operator'))) {
+        $queryOperator = $app->request()->params('operator');
+    }  else {
+        $app->contentType('application/json');
+        $app->halt(500, '{"error":"operator required."}');
+    }
+
+    // optional params
+
+    if (!empty($app->request()->params('key'))) {
+        $inputKey = (string)$app->request()->params('key');
         $arrayInputKey = array('key' => $inputKey);
-    } else {
-        $inputKey = $app->request()->params('key');
     }
 
-    if (empty($inputGroupBy)) {
+    if (!empty($app->request()->params('group_by'))) {
         $inputGroupBy = $app->request()->params('group_by');
+    } else {
+        $inputGroupBy = false;
     }
 
     if ( !empty($app->request()->params('page') )) {
         $inputPage = (int)($docsPerPage * ($app->request()->params('page') -1));
-    } else {
-        $inputPage = 0;
     }
 
-
-    if ( !empty($app->request()->params('page') )) {
-        $inputPage = (int)($docsPerPage * ($app->request()->params('page') -1));
-    } else {
-        $inputPage = 0;
-    }
-
-
-    switch ($inputOperator) {
+    switch ($queryOperator) {
 
         case "lt":
             $queryWhere = array('count' => array('$lt' => $queryOperand));
@@ -286,7 +342,7 @@ $app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)(/:page)', f
                 'created_on' => date('Y-m-d H:i:s', $doc['created_on']->sec)
             );
 
-            if (!$inputKey) {
+            if (!$arrayInputKey) {
                 $temp['key'] = $doc['key'];
 
             }
@@ -299,7 +355,7 @@ $app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)(/:page)', f
         $resultsArray = "nothing found matching your query";
     }
 
-    if($inputKey) {
+    if($arrayInputKey) {
         $resultsLabel = '"key" : "' . $inputKey .'",';
     } else {
         $resultsLabel = '"scope" : "' . $inputScope .'",';
