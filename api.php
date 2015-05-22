@@ -171,10 +171,11 @@ $app->get('/event/count/:scope(/:start)(/:end)(/:key)', function ($incScope, $in
 });
 
 // get list by operator/operand
-$app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)', function ($inputOperator, $inputOperand, $inputScope, $inputKey = '', $inputGroupBy = false) {
+$app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)(/:page)', function ($inputOperator, $inputOperand, $inputScope, $inputKey = '', $inputGroupBy = false, $inputPage = 0) {
     global $env, $app;
 
     $apiKeyId = $env['apiKeyId'];
+    $docsPerPage = 100;
 
     //setup db
 
@@ -187,6 +188,7 @@ $app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)', function 
     $inputScope = (string)$inputScope;
     $arrayInputKey = null;
     $inputKey = trim($inputKey);
+    $inputPage = (int)$inputPage;
 
     if (!empty($inputKey)) {
         $inputKey = (string)$inputKey;
@@ -198,6 +200,20 @@ $app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)', function 
     if (empty($inputGroupBy)) {
         $inputGroupBy = $app->request()->params('group_by');
     }
+
+    if ( !empty($app->request()->params('page') )) {
+        $inputPage = (int)($docsPerPage * ($app->request()->params('page') -1));
+    } else {
+        $inputPage = 0;
+    }
+
+
+    if ( !empty($app->request()->params('page') )) {
+        $inputPage = (int)($docsPerPage * ($app->request()->params('page') -1));
+    } else {
+        $inputPage = 0;
+    }
+
 
     switch ($inputOperator) {
 
@@ -230,6 +246,11 @@ $app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)', function 
             )
         )
     );
+
+    $querySort = array( '$sort' => array( '_id' => -1) );
+    $querySkip = array( '$skip' => $inputPage );
+    $queryLimit = array( '$limit' => $docsPerPage);
+
     $resultsArray = array();
 
     //setup group by & execute
@@ -241,7 +262,7 @@ $app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)', function 
                 'countKeys' => array( '$sum' => 1 )
             )
         );
-        $cursor = $collection->aggregate($queryMatch,$queryGroup);
+        $cursor = $collection->aggregate($queryMatch, $queryGroup, $querySort, $querySkip, $queryLimit);
 
         foreach ((array)$cursor['result'] as $doc) {
 
@@ -256,7 +277,7 @@ $app->get('/event/query/:operator/:operand/:scope(/:key)(/:group_by)', function 
         }
 
     } else {
-        $cursor = $collection->aggregate($queryMatch);
+        $cursor = $collection->aggregate($queryMatch, $querySort, $querySkip, $queryLimit);
 
         foreach ((array)$cursor['result'] as $doc) {
 
