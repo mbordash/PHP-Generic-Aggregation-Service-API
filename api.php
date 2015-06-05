@@ -63,6 +63,10 @@ $app->put('/event/put(/:action)(/:scope)(/:key)', function () {
     $db = new MongoClient();
     $db = $db->DayScopeKeyMetrics;
     $collection = $db->$apiKeyId;
+    $collection->ensureIndex(array('created_on' => 1));
+    $collection->ensureIndex(array('key' => 1));
+    $collection->ensureIndex(array('scope' => 1));
+    $collection->ensureIndex(array('count' => 1));
 
     $dt = new DateTime(date('Y-m-d'), new DateTimeZone('UTC'));
     $ts = $dt->getTimestamp();
@@ -121,6 +125,10 @@ $app->put('/event/set(/:scope)(/:key)(/:val)(/:date)', function () {
     $db = new MongoClient();
     $db = $db->DayScopeKeyMetrics;
     $collection = $db->$apiKeyId;
+    $collection->ensureIndex(array('created_on' => 1));
+    $collection->ensureIndex(array('key' => 1));
+    $collection->ensureIndex(array('scope' => 1));
+    $collection->ensureIndex(array('count' => 1));
 
     // Find, Modify, Upsert
 
